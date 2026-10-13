@@ -1,2 +1,5 @@
 UEBERGABE_*.md
 *.log
+__pycache__/
+work/
+site/

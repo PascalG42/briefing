@@ -38,6 +38,9 @@ VOICE = os.environ.get("TTS_VOICE", "Charon")
 STYLE = os.environ.get("TTS_STYLE", "")
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
 KEEP_DAYS = int(os.environ.get("KEEP_DAYS", "30"))
+# Gratis-Kontingent: wenige Anfragen pro Tag. Deshalb Abschnitte zu grossen Anfragen buendeln.
+GEMINI_MAX_WORDS = int(os.environ.get("GEMINI_MAX_WORDS", "750"))
+GEMINI_PAUSE = "\n\n<short pause>\n\n"
 
 FEED_TITLE = "Briefing"
 FEED_DESCRIPTION = "Automatisch erzeugtes deutsches News-Briefing."
@@ -141,6 +144,8 @@ def gemini_section(text, out_wav):
             break
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:500]
+            if e.code == 429 and "PerDay" in detail:
+                raise TTSError(f"Gemini-Tageslimit erreicht: {detail}")
             if e.code in (429, 500, 503) and attempt < 2:
                 log(f"    Gemini HTTP {e.code}, neuer Versuch in 40 s")
                 time.sleep(40)
@@ -203,10 +208,26 @@ def piper_section(text, out_wav):
 
 # ---------- Folge bauen ----------
 
+def gemini_chunks(sections):
+    """Fasst Abschnitte zu Bloecken von hoechstens GEMINI_MAX_WORDS Woertern zusammen."""
+    chunks, current, words = [], [], 0
+    for text in sections:
+        n = len(text.split())
+        if current and words + n > GEMINI_MAX_WORDS:
+            chunks.append(GEMINI_PAUSE.join(current))
+            current, words = [], 0
+        current.append(text)
+        words += n
+    if current:
+        chunks.append(GEMINI_PAUSE.join(current))
+    return chunks
+
+
 def synthesize(ep, engine, workdir):
+    texts = gemini_chunks(ep["sections"]) if engine is gemini_section else ep["sections"]
     parts = []
-    for i, text in enumerate(ep["sections"], 1):
-        log(f"    Abschnitt {i}/{len(ep['sections'])} ({len(text.split())} Woerter)")
+    for i, text in enumerate(texts, 1):
+        log(f"    Teil {i}/{len(texts)} ({len(text.split())} Woerter)")
         wav = workdir / f"{engine.__name__}_{i:02d}.wav"
         engine(text, wav)
         norm = workdir / f"norm_{i:02d}.wav"
