@@ -33,7 +33,7 @@ if exist "%DATEI%" (
 
 echo.
 echo [2/6] Nachrichten herunterladen ...
-python scriptsetch.py
+python scripts\fetch.py
 if errorlevel 1 (
   echo.
   echo FEHLER: Keine Nachrichten geladen. Internetverbindung pruefen.

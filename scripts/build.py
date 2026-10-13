@@ -283,9 +283,9 @@ def fetch_previous():
         return {}
 
 
-def reuse(slug, out_mp3):
+def reuse(name, out_mp3):
     try:
-        urllib.request.urlretrieve(f"{BASE_URL}/audio/{slug}.mp3", out_mp3)
+        urllib.request.urlretrieve(f"{BASE_URL}/audio/{name}", out_mp3)
         return True
     except Exception as e:
         log(f"  Alte MP3 nicht ladbar ({e})")
@@ -311,7 +311,7 @@ def write_feed(episodes, manifest):
     items = []
     for ep in episodes:
         info = manifest[ep["slug"]]
-        url = f"{BASE_URL}/audio/{ep['slug']}.mp3"
+        url = f"{BASE_URL}/audio/{info['file']}"
         pub = dt.datetime.combine(ep["date"], dt.time(5, 0), dt.timezone.utc)
         secs = int(info["duration"])
         notes = shownotes(ep).replace("]]>", "]]&gt;")
@@ -367,9 +367,11 @@ def main():
     failed = []
     for ep in episodes:
         log(f"{ep['slug']}: {ep['title']}")
-        out_mp3 = AUDIO / f"{ep['slug']}.mp3"
+        # Fingerabdruck im Dateinamen: geaenderte Folgen gelten fuer Podcast-Apps als neue Folge.
+        name = f"{ep['slug']}-{ep['hash'][:8]}.mp3"
+        out_mp3 = AUDIO / name
         old = previous.get(ep["slug"])
-        if old and old.get("hash") == ep["hash"] and reuse(ep["slug"], out_mp3):
+        if old and old.get("hash") == ep["hash"] and reuse(old.get("file", f"{ep['slug']}.mp3"), out_mp3):
             log("  unveraendert, bestehende MP3 uebernommen")
             engine = old.get("engine", "?")
         else:
@@ -381,6 +383,7 @@ def main():
                 continue
         manifest[ep["slug"]] = {
             "hash": ep["hash"],
+            "file": name,
             "engine": engine,
             "bytes": out_mp3.stat().st_size,
             "duration": duration(out_mp3),
