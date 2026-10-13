@@ -21,9 +21,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     env:
       TTS_MODEL: ${{ vars.TTS_MODEL || 'gemini-3.8-flash-tts' }}
       TTS_VOICE: ${{ vars.TTS_VOICE || 'Charon' }}
@@ -54,5 +51,13 @@ jobs:
         with:
           path: site
 
+  # Eigener Job: bei Fehlern einzeln wiederholbar, ohne erneut zu vertonen.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@v5
